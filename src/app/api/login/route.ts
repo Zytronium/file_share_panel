@@ -5,11 +5,6 @@ import { createSessionToken, SESSION_COOKIE } from "@/lib/session"
 export async function POST(request: Request) {
   const { password } = await request.json()
   const hash = process.env.ADMIN_PASSWORD_HASH
-  if (!hash)
-    console.warn("no password hash stored");
-  else
-    console.log(hash);
-  console.log("hash length:", hash?.length, JSON.stringify(hash))
 
   if (!hash || !password) {
     return NextResponse.json({ error: "Incorrect password" }, { status: 401 })
