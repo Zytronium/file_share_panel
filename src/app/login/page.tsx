@@ -38,7 +38,7 @@ export default function LoginPage() {
       </div>
 
       <form className="login-card" onSubmit={handleSubmit}>
-        <p className="eyebrow">Private vault</p>
+        <p className="eyebrow">Share Panel</p>
         <h1>Enter the password</h1>
         <input
           type="password"
