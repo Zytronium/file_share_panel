@@ -243,7 +243,7 @@ export default function AdminPage() {
     <main className="admin-screen">
       <header className="admin-header">
         <div>
-          <p className="eyebrow">Private vault</p>
+          <p className="eyebrow">Share Panel</p>
           <h1>Your files</h1>
         </div>
         <button className="ghost-button" onClick={handleLogout}>
