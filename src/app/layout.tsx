@@ -22,8 +22,8 @@ const mono = IBM_Plex_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Vault",
-  description: "A private place to store and share your files",
+  title: "Zytroshare",
+  description: "Zytronium's private file sharing service.",
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {
