@@ -20,12 +20,126 @@ function formatSize(bytes: number) {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
 }
 
+function getMediaType(key: string): "image" | "gif" | "video" | null {
+  const ext = key.split(".").pop()?.toLowerCase() ?? ""
+  if (ext === "gif") return "gif"
+  if (["jpg", "jpeg", "png", "webp", "avif", "svg"].includes(ext)) return "image"
+  if (["mp4", "webm", "mov", "mkv", "avi", "m4v"].includes(ext)) return "video"
+  return null
+}
+
+function getFileUrl(key: string): string {
+  // Fetch a fresh signed URL for preview via the share API
+  return `/api/preview?key=${encodeURIComponent(key)}`
+}
+
+function MediaThumbnail({ file, onClick }: { file: FileItem; onClick: () => void }) {
+  const mediaType = getMediaType(file.key)
+  const [src, setSrc] = useState<string | null>(null)
+  const [err, setErr] = useState(false)
+
+  useEffect(() => {
+    if (!mediaType) return
+    fetch(`/api/preview?key=${encodeURIComponent(file.key)}`)
+      .then((r) => r.json())
+      .then((d) => setSrc(d.url))
+      .catch(() => setErr(true))
+  }, [file.key, mediaType])
+
+  if (!mediaType) return null
+
+  if (err || (!src && mediaType)) {
+    return <span className="thumb-placeholder">?</span>
+  }
+
+  if (!src) {
+    return <span className="thumb-placeholder thumb-loading" />
+  }
+
+  if (mediaType === "video") {
+    return (
+      <button className="thumb-btn" onClick={onClick} aria-label="Preview video">
+        <video
+          src={src}
+          className="thumb-media"
+          muted
+          preload="metadata"
+          onMouseEnter={(e) => (e.currentTarget as HTMLVideoElement).play()}
+          onMouseLeave={(e) => {
+            const v = e.currentTarget as HTMLVideoElement
+            v.pause()
+            v.currentTime = 0
+          }}
+        />
+        <span className="thumb-play-badge">▶</span>
+      </button>
+    )
+  }
+
+  return (
+    <button className="thumb-btn" onClick={onClick} aria-label="Preview image">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt={displayName(file.key)} className="thumb-media" />
+    </button>
+  )
+}
+
+function LightboxModal({
+  file,
+  onClose,
+}: {
+  file: FileItem
+  onClose: () => void
+}) {
+  const mediaType = getMediaType(file.key)
+  const [src, setSrc] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch(`/api/preview?key=${encodeURIComponent(file.key)}`)
+      .then((r) => r.json())
+      .then((d) => setSrc(d.url))
+  }, [file.key])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose()
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [onClose])
+
+  return (
+    <div className="lightbox-backdrop" onClick={onClose}>
+      <div className="lightbox-inner" onClick={(e) => e.stopPropagation()}>
+        <button className="lightbox-close" onClick={onClose} aria-label="Close">
+          ✕
+        </button>
+        <p className="lightbox-name">{displayName(file.key)}</p>
+        {!src ? (
+          <div className="lightbox-loading">Loading…</div>
+        ) : mediaType === "video" ? (
+          <video
+            src={src}
+            controls
+            autoPlay
+            className="lightbox-media"
+          />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={src} alt={displayName(file.key)} className="lightbox-media" />
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function AdminPage() {
   const router = useRouter()
   const [files, setFiles] = useState<FileItem[]>([])
   const [loading, setLoading] = useState(true)
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const [message, setMessage] = useState("")
+  const [lightboxFile, setLightboxFile] = useState<FileItem | null>(null)
 
   const loadFiles = useCallback(async () => {
     setLoading(true)
@@ -154,6 +268,7 @@ export default function AdminPage() {
         <table className="ledger">
           <thead>
             <tr>
+              <th className="col-preview"></th>
               <th>Name</th>
               <th>Size</th>
               <th>Uploaded</th>
@@ -163,6 +278,9 @@ export default function AdminPage() {
           <tbody>
             {files.map((file) => (
               <tr key={file.key}>
+                <td className="col-preview">
+                  <MediaThumbnail file={file} onClick={() => setLightboxFile(file)} />
+                </td>
                 <td className="mono">{displayName(file.key)}</td>
                 <td className="mono">{formatSize(file.size)}</td>
                 <td className="mono">
@@ -178,6 +296,10 @@ export default function AdminPage() {
             ))}
           </tbody>
         </table>
+      )}
+
+      {lightboxFile && (
+        <LightboxModal file={lightboxFile} onClose={() => setLightboxFile(null)} />
       )}
     </main>
   )
