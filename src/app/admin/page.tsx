@@ -306,10 +306,11 @@ function TimePicker({ value, onChange, label }: { value: string; onChange: (v: s
 }
 
 function ScheduleEditorModal({
-                               token, originalKey, files, onClose, onSaved,
+                               token, originalKey, origin, files, onClose, onSaved,
                              }: {
   token: string
   originalKey: string
+  origin: string
   files: FileItem[]
   onClose: () => void
   onSaved: (msg: string) => void
@@ -396,8 +397,14 @@ function ScheduleEditorModal({
       body: JSON.stringify({ token, schedule }),
     })
     setLoading(false)
-    if (res.ok) { onSaved("Schedule saved"); onClose() }
-    else onSaved("Could not save schedule")
+    if (res.ok) {
+      const shareUrl = `${origin}/s/${token}`
+      await navigator.clipboard.writeText(shareUrl)
+      onSaved("Scheduled link copied to clipboard")
+      onClose()
+    } else {
+      onSaved("Could not save schedule")
+    }
   }
 
   async function handleClear() {
@@ -527,7 +534,7 @@ export default function AdminPage() {
   const [message, setMessage] = useState("")
   const [lightboxFile, setLightboxFile] = useState<FileItem | null>(null)
   const [tempShareFile, setTempShareFile] = useState<FileItem | null>(null)
-  const [schedTarget, setSchedTarget] = useState<{ token: string; key: string } | null>(null)
+  const [schedTarget, setSchedTarget] = useState<{ token: string; key: string; origin: string } | null>(null)
 
   const loadFiles = useCallback(async () => {
     setLoading(true)
@@ -586,15 +593,16 @@ export default function AdminPage() {
   }
 
   async function handleSchedule(key: string) {
-    // Get or create the permanent token for this file so we can attach a schedule
+    // Always create a fresh token for scheduled links -- they are independent links
+    // that resolve which file to serve at request time, separate from the permalink.
     const response = await fetch("/api/share", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key }),
+      body: JSON.stringify({ key, fresh: true }),
     })
     if (!response.ok) { setMessage("Could not open schedule editor"); return }
     const { token } = await response.json()
-    setSchedTarget({ token, key })
+    setSchedTarget({ token, key, origin: window.location.origin })
   }
 
   async function handleDelete(key: string) {
@@ -687,6 +695,7 @@ export default function AdminPage() {
             <ScheduleEditorModal
                 token={schedTarget.token}
                 originalKey={schedTarget.key}
+                origin={schedTarget.origin}
                 files={files}
                 onClose={() => setSchedTarget(null)}
                 onSaved={(msg) => setMessage(msg)}

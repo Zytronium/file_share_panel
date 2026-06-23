@@ -3,14 +3,15 @@ import { nanoid } from "nanoid"
 import { redis } from "@/lib/redis"
 
 export async function POST(request: Request) {
-  const { key, expiresInDays } = await request.json()
+  const { key, expiresInDays, fresh } = await request.json()
 
   if (!key) {
     return NextResponse.json({ error: "Missing file key" }, { status: 400 })
   }
 
   // For permanent shares (no expiry), reuse the existing token if one exists
-  if (!expiresInDays || expiresInDays <= 0) {
+  // unless fresh:true is requested (e.g. scheduled links always get a new token)
+  if (!fresh && (!expiresInDays || expiresInDays <= 0)) {
     const existingToken = await redis.get<string>(`permalink:${key}`)
     if (existingToken) {
       return NextResponse.json({ token: existingToken })
@@ -23,8 +24,10 @@ export async function POST(request: Request) {
     await redis.set(`share:${token}`, key, { ex: expiresInDays * 86400 })
   } else {
     await redis.set(`share:${token}`, key)
-    // Store as the permanent link for this file
-    await redis.set(`permalink:${key}`, token)
+    // Only store as the permanent link if this isn't a fresh/scheduled token
+    if (!fresh) {
+      await redis.set(`permalink:${key}`, token)
+    }
   }
 
   await redis.sadd(`shares-for:${key}`, token)
