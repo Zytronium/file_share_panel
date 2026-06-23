@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server"
 import { redis } from "@/lib/redis"
 
+interface Schedule {
+  mode: "since-upload" | "time-of-day"
+  timezone?: string
+  uploadedAt?: number
+  slots: unknown[]
+}
+
 // A schedule is attached to a share token and defines which file key to serve when.
 //
 // Two modes:
@@ -19,8 +26,8 @@ export async function GET(request: Request) {
     const token = searchParams.get("token")
     if (!token) return NextResponse.json({ error: "Missing token" }, { status: 400 })
 
-    const raw = await redis.get<string>(`schedule:${token}`)
-    return NextResponse.json({ schedule: raw ? JSON.parse(raw) : null })
+  const schedule = await redis.get<Schedule>(`schedule:${token}`)
+  return NextResponse.json({ schedule: schedule ?? null })
 }
 
 export async function POST(request: Request) {

@@ -73,8 +73,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     return new NextResponse("This link has expired or does not exist.", { status: 404 })
   }
 
-  const rawSchedule = await redis.get<string>(`schedule:${token}`)
-  const schedule: Schedule | null = rawSchedule ? JSON.parse(rawSchedule) : null
+  const schedule = await redis.get<Schedule>(`schedule:${token}`)
 
   const fileKey = schedule ? resolveKey(schedule, new Date(), originalKey) : originalKey
 
